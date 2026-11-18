@@ -1,0 +1,6 @@
+{
+  "name": "NEXUS AI",
+  "description": "Native Android AI content creation studio for research, script generation, shorts production, video studio, clip intelligence, project management, content calendar, and analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

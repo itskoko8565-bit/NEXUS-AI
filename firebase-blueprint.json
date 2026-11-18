@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "CreatorProject": {
+      "title": "CreatorProject",
+      "description": "A NEXUS AI creator production project moving from idea to published video.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "title": { "type": "string", "description": "Project title (1-120 chars)" },
+        "niche": { "type": "string", "description": "Content niche or topic category" },
+        "format": { "type": "string", "enum": ["LONG_FORM", "SHORT", "REEL", "PODCAST"] },
+        "stage": { "type": "string", "enum": ["IDEA", "RESEARCH", "SCRIPTED", "IN_PRODUCTION", "SCHEDULED", "PUBLISHED"] },
+        "targetPlatform": { "type": "string", "description": "Primary distribution platform" },
+        "hook": { "type": "string", "description": "Opening hook line" },
+        "notes": { "type": "string", "description": "Production notes and brief" },
+        "clipScore": { "type": "integer", "description": "Estimated retention/hook score (0-100)" },
+        "scheduledDate": { "type": "string", "description": "Optional ISO date YYYY-MM-DD" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "title", "niche", "format", "stage", "targetPlatform", "hook", "notes", "clipScore", "createdAt", "updatedAt"]
+    },
+    "ResearchBrief": {
+      "title": "ResearchBrief",
+      "description": "AI-generated topic research brief with angles, keywords, and viral score.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "topic": { "type": "string" },
+        "audience": { "type": "string" },
+        "summary": { "type": "string" },
+        "viralScore": { "type": "integer" },
+        "angles": { "type": "array" },
+        "keywords": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "topic", "audience", "summary", "viralScore", "angles", "keywords", "createdAt", "updatedAt"]
+    },
+    "GeneratedScript": {
+      "title": "GeneratedScript",
+      "description": "AI-generated long-form or short-form script with visual cues.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "format": { "type": "string", "enum": ["LONG_FORM", "SHORT", "REEL"] },
+        "tone": { "type": "string" },
+        "targetDurationSec": { "type": "integer" },
+        "hook": { "type": "string" },
+        "body": { "type": "string" },
+        "cta": { "type": "string" },
+        "visualCues": { "type": "array" },
+        "projectId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "format", "tone", "targetDurationSec", "hook", "body", "cta", "visualCues", "createdAt", "updatedAt"]
+    },
+    "CalendarEntry": {
+      "title": "CalendarEntry",
+      "description": "Scheduled release item on the creator content calendar.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "platform": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["PLANNED", "FILMING", "READY", "PUBLISHED"] },
+        "projectId": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "platform", "scheduledDate", "scheduledTime", "status", "notes", "createdAt", "updatedAt"]
+    },
+    "ClipAnalysis": {
+      "title": "ClipAnalysis",
+      "description": "Clip Intelligence audit containing retention score, hook strength, and highlights.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "clipTitle": { "type": "string" },
+        "sourceSummary": { "type": "string" },
+        "retentionScore": { "type": "integer" },
+        "hookStrength": { "type": "integer" },
+        "pacingVerdict": { "type": "string" },
+        "highlights": { "type": "array" },
+        "improvements": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "clipTitle", "sourceSummary", "retentionScore", "hookStrength", "pacingVerdict", "highlights", "improvements", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/CreatorProject" },
+      "description": "User-owned creator video projects"
+    },
+    "/users/{userId}/researchBriefs/{briefId}": {
+      "schema": { "$ref": "#/entities/ResearchBrief" },
+      "description": "User-owned AI content research briefs"
+    },
+    "/users/{userId}/scripts/{scriptId}": {
+      "schema": { "$ref": "#/entities/GeneratedScript" },
+      "description": "User-owned generated scripts and shorts beats"
+    },
+    "/users/{userId}/calendarItems/{itemId}": {
+      "schema": { "$ref": "#/entities/CalendarEntry" },
+      "description": "User-owned scheduled content calendar entries"
+    },
+    "/users/{userId}/clipAnalyses/{analysisId}": {
+      "schema": { "$ref": "#/entities/ClipAnalysis" },
+      "description": "User-owned Clip Intelligence analyses"
+    }
+  }
+}

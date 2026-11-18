@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCreateTimestamps(data) {
+      return data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidUpdateTimestamps(data) {
+      return data.createdAt == existing().createdAt &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStringList(listVal, maxCount) {
+      return listVal is list &&
+             listVal.size() <= maxCount &&
+             (listVal.size() == 0 || listVal[0] is string);
+    }
+
+    function isValidProject(data, userId) {
+      return data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.niche is string && data.niche.size() <= 80 &&
+             data.format in ['LONG_FORM', 'SHORT', 'REEL', 'PODCAST'] &&
+             data.stage in ['IDEA', 'RESEARCH', 'SCRIPTED', 'IN_PRODUCTION', 'SCHEDULED', 'PUBLISHED'] &&
+             data.targetPlatform is string && data.targetPlatform.size() >= 1 && data.targetPlatform.size() <= 40 &&
+             data.hook is string && data.hook.size() <= 400 &&
+             data.notes is string && data.notes.size() <= 4000 &&
+             data.clipScore is int && data.clipScore >= 0 && data.clipScore <= 100 &&
+             (!('scheduledDate' in data) || (data.scheduledDate is string && data.scheduledDate.size() == 10 && data.scheduledDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')));
+    }
+
+    function isValidResearchBrief(data, userId) {
+      return data.userId == userId &&
+             data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 160 &&
+             data.audience is string && data.audience.size() <= 120 &&
+             data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 4000 &&
+             data.viralScore is int && data.viralScore >= 0 && data.viralScore <= 100 &&
+             isValidStringList(data.angles, 10) &&
+             isValidStringList(data.keywords, 15);
+    }
+
+    function isValidScript(data, userId) {
+      return data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.format in ['LONG_FORM', 'SHORT', 'REEL'] &&
+             data.tone is string && data.tone.size() >= 1 && data.tone.size() <= 60 &&
+             data.targetDurationSec is int && data.targetDurationSec >= 10 && data.targetDurationSec <= 7200 &&
+             data.hook is string && data.hook.size() <= 600 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 12000 &&
+             data.cta is string && data.cta.size() <= 600 &&
+             isValidStringList(data.visualCues, 25) &&
+             (!('projectId' in data) || (data.projectId is string && isValidId(data.projectId)));
+    }
+
+    function isValidCalendarEntry(data, userId) {
+      return data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+             data.platform is string && data.platform.size() >= 1 && data.platform.size() <= 40 &&
+             data.scheduledDate is string && data.scheduledDate.size() == 10 && data.scheduledDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             data.scheduledTime is string && data.scheduledTime.size() >= 4 && data.scheduledTime.size() <= 10 &&
+             data.status in ['PLANNED', 'FILMING', 'READY', 'PUBLISHED'] &&
+             data.notes is string && data.notes.size() <= 1000 &&
+             (!('projectId' in data) || (data.projectId is string && isValidId(data.projectId)));
+    }
+
+    function isValidClipAnalysis(data, userId) {
+      return data.userId == userId &&
+             data.clipTitle is string && data.clipTitle.size() >= 1 && data.clipTitle.size() <= 160 &&
+             data.sourceSummary is string && data.sourceSummary.size() >= 1 && data.sourceSummary.size() <= 4000 &&
+             data.retentionScore is int && data.retentionScore >= 0 && data.retentionScore <= 100 &&
+             data.hookStrength is int && data.hookStrength >= 0 && data.hookStrength <= 100 &&
+             data.pacingVerdict is string && data.pacingVerdict.size() >= 1 && data.pacingVerdict.size() <= 200 &&
+             isValidStringList(data.highlights, 12) &&
+             isValidStringList(data.improvements, 10);
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow write: if false;
+
+      match /projects/{projectId} {
+        allow get: if isOwner(userId) && isValidId(projectId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(projectId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'niche', 'format', 'stage', 'targetPlatform', 'hook', 'notes', 'clipScore', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'niche', 'format', 'stage', 'targetPlatform', 'hook', 'notes', 'clipScore', 'scheduledDate', 'createdAt', 'updatedAt']) &&
+                         isValidCreateTimestamps(incoming()) &&
+                         isValidProject(incoming(), userId);
+        allow update: if isOwner(userId) &&
+                         isValidId(projectId) &&
+                         isValidProject(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         isValidUpdateTimestamps(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'niche', 'format', 'stage', 'targetPlatform', 'hook', 'notes', 'clipScore', 'scheduledDate', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(projectId);
+      }
+
+      match /researchBriefs/{briefId} {
+        allow get: if isOwner(userId) && isValidId(briefId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(briefId) &&
+                         incoming().keys().hasAll(['userId', 'topic', 'audience', 'summary', 'viralScore', 'angles', 'keywords', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'topic', 'audience', 'summary', 'viralScore', 'angles', 'keywords', 'createdAt', 'updatedAt']) &&
+                         isValidCreateTimestamps(incoming()) &&
+                         isValidResearchBrief(incoming(), userId);
+        allow update: if isOwner(userId) &&
+                         isValidId(briefId) &&
+                         isValidResearchBrief(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         isValidUpdateTimestamps(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['topic', 'audience', 'summary', 'viralScore', 'angles', 'keywords', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(briefId);
+      }
+
+      match /scripts/{scriptId} {
+        allow get: if isOwner(userId) && isValidId(scriptId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(scriptId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'format', 'tone', 'targetDurationSec', 'hook', 'body', 'cta', 'visualCues', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'format', 'tone', 'targetDurationSec', 'hook', 'body', 'cta', 'visualCues', 'projectId', 'createdAt', 'updatedAt']) &&
+                         isValidCreateTimestamps(incoming()) &&
+                         isValidScript(incoming(), userId);
+        allow update: if isOwner(userId) &&
+                         isValidId(scriptId) &&
+                         isValidScript(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         isValidUpdateTimestamps(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'format', 'tone', 'targetDurationSec', 'hook', 'body', 'cta', 'visualCues', 'projectId', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(scriptId);
+      }
+
+      match /calendarItems/{itemId} {
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(itemId) &&
+                         incoming().keys().hasAll(['userId', 'title', 'platform', 'scheduledDate', 'scheduledTime', 'status', 'notes', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'platform', 'scheduledDate', 'scheduledTime', 'status', 'projectId', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidCreateTimestamps(incoming()) &&
+                         isValidCalendarEntry(incoming(), userId);
+        allow update: if isOwner(userId) &&
+                         isValidId(itemId) &&
+                         isValidCalendarEntry(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         isValidUpdateTimestamps(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'platform', 'scheduledDate', 'scheduledTime', 'status', 'projectId', 'notes', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(itemId);
+      }
+
+      match /clipAnalyses/{analysisId} {
+        allow get: if isOwner(userId) && isValidId(analysisId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidId(analysisId) &&
+                         incoming().keys().hasAll(['userId', 'clipTitle', 'sourceSummary', 'retentionScore', 'hookStrength', 'pacingVerdict', 'highlights', 'improvements', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'clipTitle', 'sourceSummary', 'retentionScore', 'hookStrength', 'pacingVerdict', 'highlights', 'improvements', 'createdAt', 'updatedAt']) &&
+                         isValidCreateTimestamps(incoming()) &&
+                         isValidClipAnalysis(incoming(), userId);
+        allow update: if isOwner(userId) &&
+                         isValidId(analysisId) &&
+                         isValidClipAnalysis(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         isValidUpdateTimestamps(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['clipTitle', 'sourceSummary', 'retentionScore', 'hookStrength', 'pacingVerdict', 'highlights', 'improvements', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(analysisId);
+      }
+    }
+  }
+}
