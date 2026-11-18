@@ -22,19 +22,40 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
 
-      - name: Decode debug keystore for Firebase Auth signing
+      - name: Prepare keystore and Firebase config files
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_APPLET_CONFIG_XML: ${{ secrets.FIREBASE_APPLET_CONFIG_XML }}
         run: |
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           fi
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif [ ! -f app/google-services.json ]; then
+            echo "::warning::Using placeholder app/google-services.json; set GOOGLE_SERVICES_JSON secret in GitHub for live Firebase."
+            printf '%s\n' '{"project_info":{"project_number":"000000000000","project_id":"nexus-ai-placeholder"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.aistudio.nexusai.kxmzqr"}},"oauth_client":[{"client_id":"000000000000-placeholder.apps.googleusercontent.com","client_type":3}],"api_key":[{"current_key":"AIzaSyPlaceholderKeyForCompileOnly00000"}],"services":{"appinvite_service":{"other_platform_oauth_client":[{"client_id":"000000000000-placeholder.apps.googleusercontent.com","client_type":3}]}}}],"configuration_version":"1"}' > app/google-services.json
+          fi
+          if [ -n "$FIREBASE_APPLET_CONFIG_XML" ]; then
+            printf '%s' "$FIREBASE_APPLET_CONFIG_XML" > app/src/main/res/values/firebase_applet_config.xml
+          elif [ ! -f app/src/main/res/values/firebase_applet_config.xml ]; then
+            echo "::warning::Using placeholder firebase_applet_config.xml; set FIREBASE_APPLET_CONFIG_XML secret in GitHub for live Firestore."
+            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?><resources><string name="firestore_database_id" translatable="false">nexus-ai-placeholder-db</string><string name="recaptcha_site_key" translatable="false"></string></resources>' > app/src/main/res/values/firebase_applet_config.xml
+          fi
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: gradle :app:assembleDebug --no-daemon --console=plain
 
       - name: Upload NEXUS AI APK Artifact
         uses: actions/upload-artifact@v4
